@@ -29,11 +29,15 @@ jobs:
         python manage.py makemigrations
         python manage.py migrate
     
-    - name: Run tests
+    - name: Run Django tests
+      run: |
+        python manage.py test
+    
+    - name: Run custom test runner
       run: |
         python test_runner.py
     
-    - name: Run with pytest (alternative)
+    - name: Run with pytest
       run: |
         pip install pytest pytest-django
         pytest myapp/tests.py -v
@@ -47,28 +51,63 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
       with:
-        python-version: '3.9'
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
     
-    - name: Install dependencies
+    - name: Add server to known hosts
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
     
-    - name: Run migrations
+    - name: Create deployment directory
       run: |
-        python manage.py makemigrations
-        python manage.py migrate
+        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
+    
+    - name: Copy files to server
+      run: |
+        rsync -avz --delete \
+          --exclude '.git' \
+          --exclude '.github' \
+          --exclude '.gitignore' \
+          ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}/
+    
+    - name: Install dependencies on server
+      run: |
+        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+          cd ${{ secrets.DEPLOY_PATH }}
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt
+        "
+    
+    - name: Run migrations on server
+      run: |
+        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+          cd ${{ secrets.DEPLOY_PATH }}
+          python3 manage.py makemigrations
+          python3 manage.py migrate
+        "
     
     - name: Collect static files
       run: |
-        python manage.py collectstatic --noinput
+        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+          cd ${{ secrets.DEPLOY_PATH }}
+          python3 manage.py collectstatic --noinput
+        "
     
-    - name: Deploy to production
+    - name: Restart application (example)
       run: |
-        echo "Deploying to production server..."
-        # Здесь будут команды для деплоя на ваш сервер
-        # Например: rsync, scp, или команды для вашего хостинга
-        echo "Deployment completed successfully!"
+        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+          cd ${{ secrets.DEPLOY_PATH }}
+          echo 'Deployment completed successfully!'
+          echo 'Application is ready at: http://${{ secrets.SERVER_HOST }}:8000'
+        "
+    
+    - name: Health check
+      run: |
+        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+          cd ${{ secrets.DEPLOY_PATH }}
+          # Проверяем что Django может запуститься
+          python3 manage.py check
+          echo 'Health check passed!'
+        "
