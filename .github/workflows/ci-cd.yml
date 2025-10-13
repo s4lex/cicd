@@ -1,4 +1,4 @@
-name: Django CI/CD with Auto-Deploy
+name: Django CI/CD with Local Deploy
 
 on:
   push:
@@ -15,29 +15,17 @@ jobs:
     - run: pip install -r requirements.txt
     - run: python manage.py test
 
-  deploy:
+  notify-deploy:
     needs: test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Deploy via SCP and SSH
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ vars.SERVER_HOST }}
-        username: ${{ vars.SERVER_USER }}
-        key: ${{ vars.SSH_PRIVATE_KEY }}
-        source: "./"
-        target: ${{ vars.DEPLOY_PATH }}
-    
-    - name: Run deployment commands
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ vars.SERVER_HOST }}
-        username: ${{ vars.SERVER_USER }}
-        key: ${{ vars.SSH_PRIVATE_KEY }}
-        script: |
-          cd ${{ vars.DEPLOY_PATH }}
-          python3 -m pip install -r requirements.txt
-          python3 manage.py migrate
-          echo '🎉 DEPLOYMENT SUCCESSFUL!'
+    - name: Notify to run deploy.bat
+      run: |
+        echo "✅ Tests passed!"
+        echo "📋 Run deploy.bat manually from your local machine:"
+        echo "   ./deploy.bat"
+        echo ""
+        echo "🔧 Or execute these commands manually:"
+        echo "   git pull origin main"
+        echo "   scp -r -i ~/.ssh/id_ed25519 ./* kelemnik@192.168.0.107:/home/kelemnik/app/"
+        echo "   ssh -i ~/.ssh/id_ed25519 kelemnik@192.168.0.107 'cd /home/kelemnik/app && python3 -m pip install -r requirements.txt && python3 manage.py migrate'"
