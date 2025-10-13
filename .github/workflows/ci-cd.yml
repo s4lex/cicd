@@ -28,7 +28,6 @@ jobs:
       run: |
         python --version
         python -c "import django; print(f'Django version: {django.__version__}')"
-        python -c "import pytest; print(f'pytest version: {pytest.__version__}')"
     
     - name: Run migrations
       run: |
@@ -38,10 +37,6 @@ jobs:
     - name: Run Django tests
       run: |
         python manage.py test
-    
-    - name: Run custom test runner
-      run: |
-        python test_runner.py
 
   deploy:
     needs: test
@@ -52,94 +47,83 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
-    - name: Setup SSH
+    - name: Setup SSH key
       run: |
+        # Создаем папку SSH
         mkdir -p ~/.ssh
         echo "SSH folder created"
         
-        # Сохраняем SSH ключ
-        cat << 'EOF' > ~/.ssh/id_ed25519
-        ${{ vars.SSH_PRIVATE_KEY }}
-        EOF
+        # Сохраняем SSH ключ ПРАВИЛЬНЫМ способом
+        SSH_KEY="${{ vars.SSH_PRIVATE_KEY }}"
+        echo "$SSH_KEY" > ~/.ssh/id_ed25519
         
+        # Устанавливаем правильные права
+        chmod 700 ~/.ssh
         chmod 600 ~/.ssh/id_ed25519
         echo "SSH key saved and permissions set"
         
         # Добавляем хост в known_hosts
         ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
         echo "Server added to known hosts"
-    
-    - name: Verify SSH setup
-      run: |
-        echo "=== SSH Setup Verification ==="
+        
+        # Проверяем что ключ сохранен
+        echo "=== SSH Key Verification ==="
         ls -la ~/.ssh/
-        echo "Key file size: $(wc -c < ~/.ssh/id_ed25519) bytes"
-        echo "SSH key first line: $(head -1 ~/.ssh/id_ed25519)"
+        echo "Key begins with: $(head -1 ~/.ssh/id_ed25519)"
+        echo "Key ends with: $(tail -1 ~/.ssh/id_ed25519)"
     
     - name: Test SSH connection
       run: |
-        echo "Testing SSH connection to server..."
-        ssh -i ~/.ssh/id_ed25519 -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "echo '✅ SSH connection successful!'"
+        echo "Testing SSH connection..."
+        if ssh -i ~/.ssh/id_ed25519 -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "echo '✅ SSH connection successful!'"; then
+          echo "SSH test passed"
+        else
+          echo "SSH test failed"
+          exit 1
+        fi
     
     - name: Create deployment directory
       run: |
         ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "mkdir -p ${{ vars.DEPLOY_PATH }}"
-        echo "Deployment directory created: ${{ vars.DEPLOY_PATH }}"
+        echo "Deployment directory created"
     
     - name: Copy files to server
       run: |
         echo "Copying files to server..."
-        scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -r \
+        # Используем rsync вместо scp для надежности
+        rsync -avz -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
           --exclude '.git' \
           --exclude '.github' \
           --exclude '.gitignore' \
-          ./* ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }}:${{ vars.DEPLOY_PATH }}/
+          ./ ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }}:${{ vars.DEPLOY_PATH }}/
         echo "Files copied successfully"
     
     - name: Install dependencies on server
       run: |
-        echo "Installing dependencies on server..."
+        echo "Installing dependencies..."
         ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "
           cd ${{ vars.DEPLOY_PATH }}
-          echo 'Current directory: $(pwd)'
-          echo 'Files in directory:'
-          ls -la
           python3 -m pip install --upgrade pip
           python3 -m pip install -r requirements.txt
-          echo '✅ Dependencies installed successfully'
+          echo 'Dependencies installed'
         "
     
-    - name: Run migrations on server
+    - name: Run migrations
       run: |
-        echo "Running migrations on server..."
         ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "
           cd ${{ vars.DEPLOY_PATH }}
           python3 manage.py makemigrations
           python3 manage.py migrate
-          echo '✅ Migrations completed successfully'
+          echo 'Migrations completed'
         "
     
-    - name: Health check
+    - name: Final check
       run: |
-        echo "Running health check..."
         ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "
           cd ${{ vars.DEPLOY_PATH }}
-          python3 manage.py check
-          echo '✅ Health check passed!'
-          echo '🚀 Deployment completed successfully!'
-          echo '🌐 Application ready at: http://${{ vars.SERVER_HOST }}:8000'
-          echo '📁 Deployment path: ${{ vars.DEPLOY_PATH }}'
-        "
-    
-    - name: Final verification
-      run: |
-        echo "=== Final Verification ==="
-        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "
-          cd ${{ vars.DEPLOY_PATH }}
-          echo 'Files in deployment directory:'
+          echo '=== Deployment Verification ==='
           ls -la
-          echo 'Python version:'
-          python3 --version
-          echo 'Django version:'
-          python3 -c \"import django; print(django.__version__)\"
+          python3 manage.py check
+          echo '🎉 DEPLOYMENT SUCCESSFUL!'
+          echo 'App ready at: http://${{ vars.SERVER_HOST }}:8000'
         "

@@ -1,0 +1,22 @@
+name: Simple Deploy Test
+
+on: [push]
+
+jobs:
+  simple-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ vars.SSH_PRIVATE_KEY }}" > ~/.ssh/key
+        chmod 600 ~/.ssh/key
+        ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
+        echo "SSH setup completed"
+    
+    - name: Test Deploy
+      run: |
+        ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "
+          echo 'Hello from GitHub Actions!' > /home/kelemnik/app/test.txt
+          echo 'Test file created successfully!'
+        "
