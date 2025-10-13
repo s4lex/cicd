@@ -1,0 +1,25 @@
+name: Debug CI/CD
+
+on: [push]
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check Variables
+      run: |
+        echo "=== Testing Variables ==="
+        echo "SERVER_HOST: '${{ vars.SERVER_HOST }}'"
+        echo "SERVER_USER: '${{ vars.SERVER_USER }}'"
+        echo "DEPLOY_PATH: '${{ vars.DEPLOY_PATH }}'"
+        echo "SSH_KEY length: ${#{{ vars.SSH_PRIVATE_KEY }}}"
+        
+    - name: Test SSH Connection
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ vars.SSH_PRIVATE_KEY }}" > ~/.ssh/test_key
+        chmod 600 ~/.ssh/test_key
+        ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || echo "SSH keyscan failed"
+        
+        echo "=== Testing SSH ==="
+        ssh -i ~/.ssh/test_key -o ConnectTimeout=5 ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "echo 'SSH connection successful!'" || echo "SSH connection failed"
