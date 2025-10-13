@@ -21,19 +21,28 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Setup SSH
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ vars.SSH_PRIVATE_KEY }}" > ~/.ssh/key
-        chmod 600 ~/.ssh/key
-        ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
-    
     - name: Deploy to Server
+      env:
+        SSH_KEY: ${{ vars.SSH_PRIVATE_KEY }}
+        SERVER_HOST: ${{ vars.SERVER_HOST }}
+        SERVER_USER: ${{ vars.SERVER_USER }}
+        DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       run: |
-        scp -r -i ~/.ssh/key ./* ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }}:${{ vars.DEPLOY_PATH }}/
-        ssh -i ~/.ssh/key ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "
-          cd ${{ vars.DEPLOY_PATH }}
+        # Создаем временный файл с ключом
+        TEMP_KEY=$(mktemp)
+        echo "$SSH_KEY" | base64 -d > "$TEMP_KEY"
+        chmod 600 "$TEMP_KEY"
+        
+        # Копируем файлы
+        scp -r -i "$TEMP_KEY" ./* $SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/
+        
+        # Запускаем команды на сервере
+        ssh -i "$TEMP_KEY" $SERVER_USER@$SERVER_HOST "
+          cd $DEPLOY_PATH
           python3 -m pip install -r requirements.txt
           python3 manage.py migrate
           echo '🎉 DEPLOYMENT SUCCESSFUL!'
         "
+        
+        # Удаляем временный файл
+        rm -f "$TEMP_KEY"
