@@ -1,4 +1,4 @@
-name: Django CI/CD with Auto-Deploy
+name: Django CI/CD with Local Deploy
 
 on:
   push:
@@ -19,15 +19,13 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-    - name: Setup SSH and trigger deploy
+    - name: Notify to run deploy.bat
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/key
-        chmod 600 ~/.ssh/key
-        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-        
-        # Запускаем авто-деплой на сервере
-        ssh -i ~/.ssh/key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-          cd /home/kelemnik/app
-          ./auto_deploy.sh
-        "
+        echo "✅ Tests passed!"
+        echo "📋 Run deploy.bat manually from your local machine:"
+        echo "   ./deploy.bat"
+        echo ""
+        echo "🔧 Or execute these commands manually:"
+        echo "   git pull origin main"
+        echo "   scp -r -i ~/.ssh/id_ed25519 ./* kelemnik@192.168.0.107:/home/kelemnik/app/"
+        echo "   ssh -i ~/.ssh/id_ed25519 kelemnik@192.168.0.107 'cd /home/kelemnik/app && python3 -m pip install -r requirements.txt && python3 manage.py migrate'"
