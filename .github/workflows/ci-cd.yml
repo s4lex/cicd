@@ -78,7 +78,7 @@ jobs:
     - name: Test SSH connection
       run: |
         echo "Testing SSH connection..."
-        if ssh -i ~/.ssh/id_ed25519 -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "echo '✅ SSH connection successful!'"; then
+        if ssh -i ~/.ssh/id_ed25519 ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "echo '✅ SSH connection successful!'"; then
           echo "SSH test passed"
         else
           echo "SSH test failed"
