@@ -24,16 +24,13 @@ jobs:
     - name: Setup SSH
       run: |
         mkdir -p ~/.ssh
-        echo "${{ vars.SSH_PRIVATE_KEY }}" > ~/.ssh/key
+        echo "${{ vars.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/key
         chmod 600 ~/.ssh/key
         ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
     
     - name: Deploy to Server
       run: |
-        # Копируем файлы
         scp -r -i ~/.ssh/key ./* ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }}:${{ vars.DEPLOY_PATH }}/
-        
-        # Запускаем команды на сервере
         ssh -i ~/.ssh/key ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "
           cd ${{ vars.DEPLOY_PATH }}
           python3 -m pip install -r requirements.txt
