@@ -18,5 +18,5 @@ jobs:
       run: |
         ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }} "
           echo 'Hello from GitHub Actions!' > /home/kelemnik/app/test.txt
-          echo 'Test file created successfully!'
+          echo 'Test file created successfull!'
         "
