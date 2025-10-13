@@ -1,4 +1,4 @@
-name: Django CI/CD with Local Deploy
+name: Django CI/CD Pipeline
 
 on:
   push:
@@ -13,19 +13,47 @@ jobs:
       with:
         python-version: '3.12'
     - run: pip install -r requirements.txt
+    - run: python manage.py makemigrations
+    - run: python manage.py migrate
     - run: python manage.py test
 
   deploy:
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-    - name: Notify to run deploy.bat
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
       run: |
-        echo "✅ Tests passed!"
-        echo "📋 Run deploy.bat manually from your local machine:"
-        echo "   ./deploy.bat"
-        echo ""
-        echo "🔧 Or execute these commands manually:"
-        echo "   git pull origin main"
-        echo "   scp -r -i ~/.ssh/id_ed25519 ./* kelemnik@192.168.0.107:/home/kelemnik/app/"
-        echo "   ssh -i ~/.ssh/id_ed25519 kelemnik@192.168.0.107 'cd /home/kelemnik/app && python3 -m pip install -r requirements.txt && python3 manage.py migrate'"
+        python3 -m pip install --upgrade pip
+        python3 -m pip install -r requirements.txt
+    
+    - name: Create migrations
+      run: |
+        python3 manage.py makemigrations
+    
+    - name: Apply migrations
+      run: |
+        python3 manage.py migrate
+    
+    - name: Collect static files
+      run: |
+        python3 manage.py collectstatic --noinput
+    
+    - name: Run health check
+      run: |
+        python3 manage.py check
+        echo "✅ All checks passed!"
+    
+    - name: Deployment success
+      run: |
+        echo "🎉 AUTOMATIC CI/CD PIPELINE COMPLETED!"
+        echo "🚀 Application is ready for production"
+        echo "🌐 Start server with: python3 manage.py runserver 0.0.0.0:8000"
+        echo "📊 Active migrations:"
+        python3 manage.py showmigrations --list
