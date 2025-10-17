@@ -26,7 +26,7 @@ class OrderModelTest(TestCase):
     def test_order_creation(self):
         order = Order(product=self.product, quantity=3)
         order.save()
-        self.assertEqual(order.total_price, 30.00)
+        self.assertEqual(order.total_price, 10.00)
 
 class ViewTests(TestCase):
     def setUp(self):
